@@ -1,0 +1,440 @@
+<include file="public@header" />
+<style>
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+  }
+  
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 20px;
+  }
+  
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+  }
+  
+  input:checked + .slider {
+    background-color: #1AAD19;
+  }
+  
+  input:checked + .slider:before {
+    transform: translateX(20px);
+  }
+
+  .toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .toast-notification.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .toast-notification.success {
+    background: rgba(26, 173, 25, 0.9);
+    color: white;
+  }
+
+  .toast-notification.error {
+    background: rgba(255, 59, 48, 0.9);
+    color: white;
+  }
+
+  .editable {
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 3px;
+    min-width: 50px;
+    display: inline-block;
+  }
+  
+  .editable:hover {
+    background-color: #f5f5f5;
+  }
+  
+  .editable.editing {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 1px 4px;
+  }
+  
+  .editable input {
+    border: none;
+    outline: none;
+    background: transparent;
+    width: 100%;
+  }
+</style>
+<div class="wrap js-check-wrap">
+  <!-- 添加导航标签 -->
+  <ul class="nav nav-tabs">
+    <li class="active"><a href="{:url('index')}">列表</a></li>
+    <li><a href="{:url('add')}">添加</a></li>
+  </ul>
+
+  <!-- 搜索框 -->
+  <div class="well margin-top-20">
+    <form class="form-inline" method="get" action="{:url('index')}">
+      <foreach name="searchFields" item="field">
+        <div class="form-group">
+          <label>{$comments[$field]}</label>
+          <input
+            type="text"
+            class="form-control"
+            name="{$field}"
+            value="{:input($field)}"
+          />
+        </div>
+      </foreach>
+      <button type="submit" class="btn btn-primary">搜索</button>
+      <a href="{:url('index')}" class="btn btn-danger">重置</a>
+    </form>
+  </div>
+
+  <!-- 数据表格 -->
+  <form class="js-ajax-form" method="post">
+    <div class="table-actions">
+      <if condition="in_array('delete', $config)">
+        <button class="btn btn-danger btn-sm js-ajax-submit" type="submit" 
+          data-action="{:url('batchDelete')}" 
+          data-subcheck="true" 
+          data-msg="您确定要删除这些记录吗？">批量删除</button>
+      </if>
+
+      <if condition="in_array('edit', $config)">
+        <div class="btn-group">
+          <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-toggle="dropdown">
+            批量编辑 <span class="caret"></span>
+          </button>
+          <ul class="dropdown-menu">
+            <foreach name="showFields" item="field">
+              <if condition="!in_array($field, ['id', 'created_at', 'updated_at'])">
+                <li>
+                  <a href="#" class="js-batch-edit" 
+                    data-field="{$field}" 
+                    data-title="批量编辑{$comments[$field]}"
+                    data-action="{:url('batchEdit')}">
+                    编辑{$comments[$field]}
+                    </a>
+                </li>
+              </if>
+            </foreach>
+          </ul>
+        </div>
+      </if>
+    </div>
+    <table class="table table-hover table-bordered">
+      <thead>
+        <tr>
+          <th width="16"><label><input type="checkbox" class="js-check-all" data-direction="x" data-checklist="js-check-x"></label></th>
+          <th width="50">ID</th>
+          <foreach name="showFields" item="field">
+            <if condition="$field neq 'id'">
+              <th>{$comments[$field]}</th>
+            </if>
+          </foreach>
+          <th width="130">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <volist name="list" id="item">
+          <tr>
+            <td><input type="checkbox" class="js-check" data-yid="js-check-y" data-xid="js-check-x" name="ids[]" value="{$item.id}"></td>
+            <foreach name="showFields" item="field">
+              <td>
+                <!-- 开关类型 -->
+                <if condition="$types[$field] eq 'switch'">
+                  <label class="switch">
+                    <input type="checkbox" class="js-switch" 
+                      data-id="{$item.id}"
+                      data-field="{$field}"
+                      data-value="{$item[$field]}"
+                      {$item[$field]?'checked':''}>
+                    <span class="slider"></span>
+                  </label>
+                <!-- 文本类型 且 可编辑 -->
+                <elseif condition="$types[$field] eq 'text' && in_array($field, $listEditAbleField)" />
+                  <span class="editable" 
+                    data-id="{$item.id}" 
+                    data-field="{$field}" 
+                    data-value="{$item[$field]}">{$item[$field]}</span>
+                <else />
+                  {$item[$field]}
+                </if>
+              </td>
+            </foreach>
+            <td>
+              <if condition="in_array('edit', $config)">
+                <a
+                  class="btn btn-xs btn-primary"
+                  href="{:url('edit',array('id'=>$item['id']))}"
+                  >编辑</a>
+              </if>
+              <if condition="in_array('delete', $config)">
+                <a
+                  class="btn btn-xs btn-danger js-ajax-delete"
+                href="{:url('delete',array('id'=>$item['id']))}"
+                  data-msg="您确定要删除吗？"
+                  >删除</a>
+              </if>
+            </td>
+          </tr>
+        </volist>
+      </tbody>
+    </table>
+    <div class="pagination">{$page|raw}</div>
+  </form>
+</div>
+
+<!-- 添加批量编辑的模态框 -->
+<div class="modal fade" id="batchEditModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">批量编辑</h4>
+      </div>
+      <div class="modal-body">
+        <form class="form-horizontal js-ajax-form" action="" method="post">
+          <input type="hidden" name="field" value="">
+          <input type="hidden" name="ids" value="">
+          <div class="form-group">
+            <label class="col-sm-2 control-label">新值</label>
+            <div class="col-sm-10">
+              <!-- 添加 switch 类型的输入 -->
+              <div class="switch-input" style="display:none;">
+                <label class="switch">
+                  <input type="checkbox" name="switch_value">
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <!-- 普通文本输入 -->
+              <input type="text" class="form-control text-input" name="value">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary js-batch-submit">确定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="__STATIC__/js/admin.js"></script>
+<script>
+  $(".js-switch").change(function () {
+    var $this = $(this);
+    var id = $this.data("id");
+    var field = $this.data("field");
+    var value = $this.is(":checked") ? 1 : 0;
+
+    $.post(
+      '{:url("switch")}',
+      {
+        id: id,
+        field: field,
+        value: value,
+      },
+      function (data) {
+        if (data.code != 1) {
+          // 如果保存失败，恢复开关状态
+          showToast('操作失败！', 'error');
+          $this.prop("checked", !value);
+        } else {
+          showToast('操作成功！', 'show');
+        }
+      }
+    );
+  });
+
+  // 显示 toast 消息
+  // type: show, success, error
+  function showToast(message, type = 'show', duration = 3000) {
+    $('.toast-notification').remove();
+    
+    const toast = $('<div class="toast-notification ' + type + '">' + message + '</div>');
+    $('body').append(toast);
+    
+    setTimeout(() => {
+      toast.addClass('show');
+    }, 10);
+
+    setTimeout(() => {
+      toast.removeClass('show');
+      setTimeout(() => {
+        toast.remove();
+      }, 300);
+    }, duration);
+  }
+</script>
+
+<!-- 添加必要的 JavaScript 代码 -->
+<script>
+  $(function(){
+    $('.js-batch-edit').click(function(e){
+      e.preventDefault();
+      var $this = $(this);
+      var field = $this.data('field');
+      var title = $this.data('title');
+      var action = $this.data('action');
+      var ids = [];
+      
+      $('input[name="ids[]"]:checked').each(function(){
+        ids.push($(this).val());
+      });
+      
+      if(ids.length == 0){
+        showToast('请选择要编辑的记录！', 'error');
+        return;
+      }
+      
+      var $modal = $('#batchEditModal');
+      $modal.find('.modal-title').text(title);
+      $modal.find('form').attr('action', action);
+      $modal.find('input[name="field"]').val(field);
+      $modal.find('input[name="ids"]').val(ids.join(','));
+      
+      // 判断字段类型是否为 switch
+      var isSwitch = $('input.js-switch[data-field="' + field + '"]').length > 0;
+      $modal.find('.switch-input').toggle(isSwitch);
+      $modal.find('.text-input').toggle(!isSwitch);
+      
+      $modal.modal('show');
+    });
+    
+    // 修改提交处理代码
+    $('.js-batch-submit').click(function(){
+      var $form = $('#batchEditModal form');
+      var field = $form.find('input[name="field"]').val();
+      var isSwitch = $('input.js-switch[data-field="' + field + '"]').length > 0;
+      
+      // 根据字段类型设置提交的值
+      if(isSwitch) {
+        var switchValue = $form.find('input[name="switch_value"]').is(':checked') ? 1 : 0;
+        $form.find('input[name="value"]').val(switchValue);
+      }
+      
+      var formData = $form.serialize();
+      
+      $.post($form.attr('action'), formData, function(data) {
+        if(data.code == 1) {
+          showToast(data.msg || '操作成功！', 'show');
+          setTimeout(function() {
+            window.location.reload();
+          }, 1500);
+        } else {
+          showToast(data.msg || '操作失败！', 'error');
+        }
+        $('#batchEditModal').modal('hide');
+      });
+    });
+  });
+</script>
+
+<!-- 添加单击编辑功能 -->
+<script>
+$(function(){
+  // 单击编辑功能
+  $(document).on('click', '.editable', function(e) {
+    if($(this).hasClass('editing')) return;
+    
+    // 先关闭其他正在编辑的单元格
+    $('.editable.editing').each(function() {
+      var $this = $(this);
+      var originalValue = $this.data('value');
+      $this.removeClass('editing').html(originalValue);
+    });
+    
+    var $this = $(this);
+    var value = $this.data('value');
+    var width = Math.max($this.width(), 100); // 设置最小宽度
+    
+    $this.addClass('editing');
+    var $input = $('<input type="text" style="width: ' + (width + 20) + 'px">').val(value);
+    $this.html($input);
+    $input.focus();
+    
+    // 处理失去焦点和回车事件
+    $input.on('blur keypress', function(e) {
+      if(e.type === 'keypress' && e.which !== 13) return;
+      e.preventDefault(); // 防止回车触发表单提交
+      
+      var newValue = $(this).val().trim();
+      if(newValue === value) {
+        $this.removeClass('editing').html(value);
+        return;
+      }
+      
+      $.post('{:url("listEdit")}', {
+        id: $this.data('id'),
+        field: $this.data('field'),
+        value: newValue
+      }, function(data) {
+        if(data.code == 1) {
+          $this.removeClass('editing').html(newValue).data('value', newValue);
+          showToast('修改成功！', 'success');
+        } else {
+          $this.removeClass('editing').html(value);
+          showToast(data.msg || '修改失败！', 'error');
+        }
+      });
+    });
+    
+    // 处理 ESC 键取消编辑
+    $input.on('keydown', function(e) {
+      if(e.which === 27) { // ESC 键
+        $this.removeClass('editing').html(value);
+      }
+    });
+  });
+  
+  // 点击页面其他地方关闭编辑状态
+  $(document).on('click', function(e) {
+    if(!$(e.target).closest('.editable').length && !$(e.target).is('input')) {
+      $('.editable.editing').each(function() {
+        var $this = $(this);
+        var originalValue = $this.data('value');
+        $this.removeClass('editing').html(originalValue);
+      });
+    }
+  });
+});
+</script>
+</body>
+</html>
